@@ -4,178 +4,197 @@
     <meta charset="UTF-8">
     <title>Gebrauchtwagenhändler Tycoon</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
-        header { background: #333; color: #fff; padding: 10px; text-align: center; font-size: 18px; }
-        #main { display: flex; padding: 10px; gap: 20px; }
-        #market, #inventory, #designer { flex: 1; background: #fff; padding: 10px; border-radius: 5px; }
-        h2 { margin-top: 0; }
-        .car { border-bottom: 1px solid #ccc; padding: 10px 0; }
-        .bar { height: 10px; background: #ccc; border-radius: 3px; margin: 3px 0; }
-        .bar-inner { height: 10px; border-radius: 3px; }
-        .btn { padding: 5px 10px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 3px; }
-        .btn:disabled { background: #aaa; }
-        .slider { width: 100%; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        #statusBar {
+            background-color: #222;
+            color: #fff;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #main {
+            padding: 20px;
+        }
+
+        .car-list, .owned-cars {
+            margin-top: 20px;
+        }
+
+        .car {
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .bar-container {
+            background-color: #ddd;
+            width: 100%;
+            height: 20px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        .bar {
+            height: 100%;
+            border-radius: 5px;
+        }
+
+        .bar.optic {
+            background-color: orange;
+        }
+
+        .bar.tech {
+            background-color: green;
+        }
+
+        .actions {
+            margin-top: 10px;
+        }
+
+        .slider {
+            width: 100%;
+        }
     </style>
 </head>
 <body>
-    <header id="statusBar">
-        Kontostand: €<span id="money">10000</span> / Fahrzeuge im Bestand: <span id="inventoryCount">0</span>
-    </header>
+    <div id="statusBar">
+        <div id="balance">Kontostand: 10.000€</div>
+        <div id="inventoryCount">Fahrzeuge im Bestand: 0</div>
+    </div>
 
     <div id="main">
-        <div id="market">
-            <h2>Fahrzeuge auf dem Markt</h2>
-            <div id="carList"></div>
-        </div>
+        <h2>Fahrzeuge zum Kauf</h2>
+        <div class="car-list" id="carMarket"></div>
 
-        <div id="inventory">
-            <h2>Dein Bestand</h2>
-            <div id="ownedCars"></div>
-        </div>
-
-        <div id="designer">
-            <h2>Fahrzeug-Designer</h2>
-            <div id="designerContent">Wähle ein Fahrzeug aus deinem Bestand.</div>
-        </div>
+        <h2>Eigene Fahrzeuge</h2>
+        <div class="owned-cars" id="ownedCars"></div>
     </div>
 
     <script>
-        const moneyEl = document.getElementById("money");
-        const inventoryCountEl = document.getElementById("inventoryCount");
-        const carList = document.getElementById("carList");
-        const ownedCars = document.getElementById("ownedCars");
-        const designerContent = document.getElementById("designerContent");
-
-        let money = 10000;
+        let balance = 10000;
         let inventory = [];
 
-        const fakeModels = ["TurboFox", "Velostar", "Cheetah GT", "IronRunner", "Zentara"];
-        const fakeBrands = ["Autostar", "MechNova", "SpeedCore", "UrbanDrive", "Motoline"];
-
-        function getRandomInt(min, max) {
-            return Math.floor(Math.random() * (max - min + 1)) + min;
-        }
-
-        function createCarForSale() {
-            return {
-                brand: fakeBrands[getRandomInt(0, fakeBrands.length - 1)],
-                model: fakeModels[getRandomInt(0, fakeModels.length - 1)],
-                optCond: getRandomInt(30, 90),
-                techCond: getRandomInt(30, 90),
-                repairCost: getRandomInt(800, 2500),
-                price: getRandomInt(2000, 6000)
-            };
-        }
+        const sampleCars = [
+            { brand: "Fiktiva", model: "Sprinto", optic: 40, tech: 60, repairCost: 1200 },
+            { brand: "Automax", model: "Zoomer", optic: 70, tech: 30, repairCost: 2200 },
+            { brand: "Velora", model: "Urban", optic: 20, tech: 50, repairCost: 1500 },
+        ];
 
         function updateStatus() {
-            moneyEl.textContent = money;
-            inventoryCountEl.textContent = inventory.length;
+            document.getElementById("balance").textContent = `Kontostand: ${balance.toLocaleString()}€`;
+            document.getElementById("inventoryCount").textContent = `Fahrzeuge im Bestand: ${inventory.length}`;
         }
 
-        function renderCarList() {
-            carList.innerHTML = "";
-            for (let i = 0; i < 5; i++) {
-                const car = createCarForSale();
-                const carEl = document.createElement("div");
-                carEl.className = "car";
-                carEl.innerHTML = `
-                    <strong>${car.brand} ${car.model}</strong><br>
-                    Optischer Zustand:
-                    <div class="bar"><div class="bar-inner" style="width:${car.optCond}%;background:orange"></div></div>
-                    Technischer Zustand:
-                    <div class="bar"><div class="bar-inner" style="width:${car.techCond}%;background:green"></div></div>
-                    Geschätzte Reparaturkosten: €${car.repairCost}<br>
-                    Kaufpreis: €${car.price}<br>
-                    <button class="btn" onclick='buyCar(${JSON.stringify(car)})'>Kaufen</button>
+        function renderBar(value, type) {
+            return `<div class="bar-container">
+                <div class="bar ${type}" style="width: ${value}%;"></div>
+            </div>`;
+        }
+
+        function renderMarket() {
+            const marketDiv = document.getElementById("carMarket");
+            marketDiv.innerHTML = '';
+            sampleCars.forEach((car, index) => {
+                marketDiv.innerHTML += `
+                    <div class="car">
+                        <strong>${car.brand} ${car.model}</strong><br>
+                        Optischer Zustand:
+                        ${renderBar(car.optic, 'optic')}
+                        Technischer Zustand:
+                        ${renderBar(car.tech, 'tech')}
+                        Geschätzte Reparaturkosten: ${car.repairCost}€<br>
+                        <div class="actions">
+                            <button onclick="buyCar(${index})">Kaufen</button>
+                        </div>
+                    </div>
                 `;
-                carList.appendChild(carEl);
-            }
+            });
         }
 
-        function buyCar(car) {
-            if (money >= car.price) {
-                money -= car.price;
-                inventory.push({
-                    ...car,
-                    boughtFor: car.price,
-                    optRepaired: false,
-                    techRepaired: false,
-                    listed: false
-                });
+        function buyCar(index) {
+            const car = sampleCars[index];
+            if (balance >= car.repairCost) {
+                balance -= car.repairCost;
+                inventory.push({ ...car, salePrice: null });
                 updateStatus();
                 renderInventory();
-                renderCarList();
             } else {
                 alert("Nicht genug Geld!");
             }
         }
 
         function renderInventory() {
-            ownedCars.innerHTML = "";
+            const ownDiv = document.getElementById("ownedCars");
+            ownDiv.innerHTML = '';
             inventory.forEach((car, index) => {
-                const carEl = document.createElement("div");
-                carEl.className = "car";
-                carEl.innerHTML = `
-                    <strong>${car.brand} ${car.model}</strong><br>
-                    <button class="btn" onclick='openDesigner(${index})'>Bearbeiten</button>
+                ownDiv.innerHTML += `
+                    <div class="car">
+                        <strong>${car.brand} ${car.model}</strong><br>
+                        Optischer Zustand:
+                        ${renderBar(car.optic, 'optic')}
+                        Technischer Zustand:
+                        ${renderBar(car.tech, 'tech')}<br>
+                        <div class="actions">
+                            <button onclick="repairCar(${index}, 'optic')">Optik verbessern (-500€)</button>
+                            <button onclick="repairCar(${index}, 'tech')">Technik verbessern (-500€)</button>
+                        </div>
+                        <div class="actions" style="margin-top:10px;">
+                            <button onclick="showSellOptions(${index})">Inserieren</button>
+                        </div>
+                        <div id="sellOptions${index}" style="display:none;">
+                            <p>Gesamtkosten: ${car.repairCost}€</p>
+                            <input type="range" min="1000" max="10000" value="5000" class="slider" id="priceSlider${index}">
+                            <p>Verkaufspreis: <span id="priceValue${index}">5000</span>€</p>
+                            <button onclick="sellCar(${index})">Inserat veröffentlichen</button>
+                        </div>
+                    </div>
                 `;
-                ownedCars.appendChild(carEl);
             });
         }
 
-        function openDesigner(index) {
-            const car = inventory[index];
-            designerContent.innerHTML = `
-                <strong>${car.brand} ${car.model}</strong><br>
-                Gekauft für: €${car.boughtFor} <br>
-                Reparaturkosten optisch: €${car.repairCost} <br>
-                Reparaturkosten technisch: €${car.repairCost} <br>
-                <button class="btn" onclick='repairCar(${index},"opt")' ${car.optRepaired ? "disabled" : ""}>Optisch reparieren</button>
-                <button class="btn" onclick='repairCar(${index},"tech")' ${car.techRepaired ? "disabled" : ""}>Technisch reparieren</button>
-                <br><br>
-                <label>Verkaufspreis festlegen:</label>
-                <input type="range" min="1000" max="20000" step="100" value="10000" class="slider" id="priceSlider${index}">
-                <span id="sliderValue${index}">€10000</span><br>
-                <button class="btn" onclick='listCar(${index})'>Inserieren</button>
-            `;
-            document.getElementById(`priceSlider${index}`).oninput = function() {
-                document.getElementById(`sliderValue${index}`).textContent = "€" + this.value;
-            };
-        }
-
         function repairCar(index, type) {
-            const car = inventory[index];
-            if (money >= car.repairCost) {
-                money -= car.repairCost;
-                if (type === "opt") car.optRepaired = true;
-                if (type === "tech") car.techRepaired = true;
+            if (balance >= 500) {
+                balance -= 500;
+                if (type === 'optic' && inventory[index].optic < 100) inventory[index].optic += 10;
+                if (type === 'tech' && inventory[index].tech < 100) inventory[index].tech += 10;
                 updateStatus();
-                openDesigner(index);
+                renderInventory();
             } else {
                 alert("Nicht genug Geld!");
             }
         }
 
-        function listCar(index) {
-            const price = parseInt(document.getElementById(`priceSlider${index}`).value);
-            const car = inventory[index];
-            car.listed = true;
-            designerContent.innerHTML = "Fahrzeug inseriert! Wird bald verkauft...";
+        function showSellOptions(index) {
+            document.getElementById(`sellOptions${index}`).style.display = 'block';
+            const slider = document.getElementById(`priceSlider${index}`);
+            const output = document.getElementById(`priceValue${index}`);
+            output.textContent = slider.value;
+            slider.oninput = () => output.textContent = slider.value;
+        }
+
+        function sellCar(index) {
+            const slider = document.getElementById(`priceSlider${index}`);
+            const price = parseInt(slider.value);
+            const sellTime = Math.max(1000, 10000 - (inventory[index].optic + inventory[index].tech) * 30);
             setTimeout(() => {
-                const saleChance = car.optRepaired && car.techRepaired ? 1.2 : 0.8;
-                const sellTime = getRandomInt(3, 10) * 1000 * (1 / saleChance);
-                setTimeout(() => {
-                    money += price;
-                    inventory.splice(index, 1);
-                    updateStatus();
-                    renderInventory();
-                    designerContent.innerHTML = "Fahrzeug wurde verkauft!";
-                }, sellTime);
-            }, 1000);
+                balance += price;
+                inventory.splice(index, 1);
+                updateStatus();
+                renderInventory();
+                alert(`Auto für ${price}€ verkauft!`);
+            }, sellTime);
         }
 
         updateStatus();
-        renderCarList();
+        renderMarket();
     </script>
 </body>
 </html>
