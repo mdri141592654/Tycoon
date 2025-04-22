@@ -24,219 +24,229 @@
 </head>
 <body>
 
-    <div class="status" id="status">Kontostand: 5000€ / Fahrzeuge im Bestand: 0</div>
+<div class="status" id="status">Kontostand: 5000€ / Fahrzeuge im Bestand: 0</div>
 
-    <details class="dropdown">
-        <summary>Fahrzeuge zum Kauf</summary>
-        <div id="market"></div>
-    </details>
+<details class="dropdown">
+    <summary>Fahrzeuge zum Kauf</summary>
+    <div id="market"></div>
+</details>
 
-    <details class="dropdown">
-        <summary>Fahrzeuge im Bestand</summary>
-        <div id="inventory"></div>
-    </details>
+<details class="dropdown">
+    <summary>Fahrzeuge im Bestand</summary>
+    <div id="inventory"></div>
+</details>
 
-    <details class="dropdown">
-        <summary>Inserierte Fahrzeuge</summary>
-        <div id="listed"></div>
-    </details>
+<details class="dropdown">
+    <summary>Inserierte Fahrzeuge</summary>
+    <div id="listed"></div>
+</details>
 
-    <script>
-        let balance = 5000;
-        let inventory = [];
-        let listed = [];
-        let marketCars = [];
+<script>
+    let balance = 5000;
+    let inventory = [];
+    let listed = [];
+    let marketCars = [];
 
-        const manufacturers = ["AutoLux", "RoadMax", "VelociCar", "SunDrive", "PrimeAuto"];
-        const models = ["Turbo", "Speedster", "Comet", "Falcon", "EcoRide"];
+    const manufacturers = ["AutoLux", "RoadMax", "VelociCar", "SunDrive", "PrimeAuto"];
+    const models = ["Turbo", "Speedster", "Comet", "Falcon", "EcoRide"];
 
-        function updateStatus() {
-            document.getElementById("status").innerText = `Kontostand: ${balance}€ / Fahrzeuge im Bestand: ${inventory.length}`;
-        }
+    function updateStatus() {
+        document.getElementById("status").innerText = `Kontostand: ${balance}€ / Fahrzeuge im Bestand: ${inventory.length}`;
+    }
 
-        function getRandomCar() {
-            const manufacturer = manufacturers[Math.floor(Math.random() * manufacturers.length)];
-            const model = models[Math.floor(Math.random() * models.length)];
-            const optik = Math.floor(Math.random() * 70) + 10;
-            const technik = Math.floor(Math.random() * 70) + 10;
-            const price = Math.floor((optik + technik) * 10 + Math.random() * 500);
-            const repCost = Math.floor((100 - technik) * 2 + (100 - optik));
-            const id = Math.random().toString(36).substring(2, 9);
-            const ttl = Date.now() + (30000 + Math.random() * 240000); // 30s bis 5min
-            return { id, manufacturer, model, optik, technik, price, repCost, ttl };
-        }
+    function getRandomCar() {
+        const manufacturer = manufacturers[Math.floor(Math.random() * manufacturers.length)];
+        const model = models[Math.floor(Math.random() * models.length)];
+        const optik = Math.floor(Math.random() * 70) + 10;
+        const technik = Math.floor(Math.random() * 70) + 10;
+        const price = Math.floor((optik + technik) * 10 + Math.random() * 500);
+        const repCost = Math.floor((100 - technik) * 2 + (100 - optik));
+        const id = Math.random().toString(36).substring(2, 9);
+        const ttl = Date.now() + (30000 + Math.random() * 240000);
+        return { id, manufacturer, model, optik, technik, price, repCost, ttl };
+    }
 
-        function renderMarket() {
-            const now = Date.now();
-            marketCars = marketCars.filter(car => car.ttl > now);
-            const container = document.getElementById("market");
-            container.innerHTML = "";
-            marketCars.forEach(car => {
-                const div = document.createElement("div");
-                div.className = "car";
-                const timeLeft = Math.max(0, Math.floor((car.ttl - now) / 1000));
-                div.innerHTML = `
-                    <strong>${car.manufacturer} ${car.model}</strong><br>
-                    Optik: <div class="bar"><div class="bar-fill" style="width:${car.optik}%; background:orange"></div></div>
-                    Technik: <div class="bar"><div class="bar-fill" style="width:${car.technik}%; background:blue"></div></div>
-                    Geschätzte Reparaturkosten: ${car.repCost}€<br>
-                    Kaufpreis: ${car.price}€<br>
-                    Verfügbar für: ${timeLeft}s<br>
-                    <button onclick="buyCar('${car.id}')">Kaufen</button>
-                `;
-                container.appendChild(div);
-            });
-        }
+    function renderMarket() {
+        const now = Date.now();
+        marketCars = marketCars.filter(car => car.ttl > now);
+        const container = document.getElementById("market");
+        container.innerHTML = "";
+        marketCars.forEach(car => {
+            const div = document.createElement("div");
+            div.className = "car";
+            const timeLeft = Math.max(0, Math.floor((car.ttl - now) / 1000));
+            div.innerHTML = `
+                <strong>${car.manufacturer} ${car.model}</strong><br>
+                Optik: <div class="bar"><div class="bar-fill" style="width:${car.optik}%; background:orange"></div></div>
+                Technik: <div class="bar"><div class="bar-fill" style="width:${car.technik}%; background:blue"></div></div>
+                Geschätzte Reparaturkosten: ${car.repCost}€<br>
+                Kaufpreis: ${car.price}€<br>
+                Verfügbar für: ${timeLeft}s<br>
+                <button onclick="buyCar('${car.id}')">Kaufen</button>
+            `;
+            container.appendChild(div);
+        });
+    }
 
-        function buyCar(id) {
-            const car = marketCars.find(c => c.id === id);
-            if (!car) return;
-            const price = parseInt(car.price);
-            if (balance < price) return alert("Nicht genug Geld!");
-            balance -= price;
+    function buyCar(id) {
+        const car = marketCars.find(c => c.id === id);
+        if (!car) return;
+        const price = parseInt(car.price);
+        if (balance < price) return alert("Nicht genug Geld!");
+        balance -= price;
+        updateStatus();
+        marketCars = marketCars.filter(c => c.id !== id);
+        renderMarket();
+        setTimeout(() => {
+            inventory.push({ ...car, repairTotal: 0, salePrice: null });
             updateStatus();
-            marketCars = marketCars.filter(c => c.id !== id);
-            renderMarket();
-            setTimeout(() => {
-                inventory.push({ ...car, repairTotal: 0, salePrice: null });
-                updateStatus();
-                renderInventory();
-            }, 3000);
-        }
+            renderInventory();
+        }, 3000);
+    }
 
-        let busy = false;
+    let busy = false;
 
-        function renderInventory() {
-            const container = document.getElementById("inventory");
-            container.innerHTML = "";
-            inventory.forEach((car, index) => {
-                const div = document.createElement("div");
-                div.className = "car";
-                div.innerHTML = `
-                    <strong>${car.manufacturer} ${car.model}</strong><br>
-                    Optik: <div class="bar"><div class="bar-fill" style="width:${car.optik}%; background:orange"></div></div>
-                    Technik: <div class="bar"><div class="bar-fill" style="width:${car.technik}%; background:blue"></div></div>
-                    Gesamt-Kosten bisher: ${car.price + car.repairTotal}€<br>
-                    <button onclick="repair(${index})" ${busy ? 'disabled' : ''}>Reparieren (${(100 - car.technik) * 2}€)</button>
-                    <button onclick="polish(${index})" ${busy ? 'disabled' : ''}>Optisch aufwerten (${Math.floor((100 - car.optik) / 2)}€)</button>
-                    <button onclick="prepareSale(${index})" ${busy ? 'disabled' : ''}>Inserieren</button>
-                    <div class="progress" id="progress-${index}"></div>
-                `;
-                container.appendChild(div);
-            });
-        }
+    function renderInventory() {
+        const container = document.getElementById("inventory");
+        container.innerHTML = "";
+        inventory.forEach((car, index) => {
+            const div = document.createElement("div");
+            div.className = "car";
+            div.innerHTML = `
+                <strong>${car.manufacturer} ${car.model}</strong><br>
+                Optik: <div class="bar"><div class="bar-fill" style="width:${car.optik}%; background:orange"></div></div>
+                Technik: <div class="bar"><div class="bar-fill" style="width:${car.technik}%; background:blue"></div></div>
+                Gesamt-Kosten bisher: ${car.price + car.repairTotal}€<br>
+                <button onclick="repair(${index})" ${busy ? 'disabled' : ''}>Reparieren (${(100 - car.technik) * 2}€)</button>
+                <button onclick="polish(${index})" ${busy ? 'disabled' : ''}>Optisch aufwerten (${Math.floor((100 - car.optik) / 2)}€)</button>
+                <button onclick="prepareSale(${index})" ${busy ? 'disabled' : ''}>Inserieren</button>
+                <div class="progress" id="progress-${index}"></div>
+            `;
+            container.appendChild(div);
+        });
+    }
 
-        function animateProgress(id, duration, callback) {
-            const bar = document.getElementById(id);
-            let start = Date.now();
-            const interval = setInterval(() => {
-                const percent = Math.min(100, ((Date.now() - start) / duration) * 100);
-                bar.innerHTML = `<div class="bar"><div class="bar-fill" style="width:${percent}%; background:gray"></div></div>`;
-                if (percent >= 100) {
-                    clearInterval(interval);
-                    callback();
-                }
-            }, 100);
-        }
+    function animateProgress(id, duration, callback) {
+        const bar = document.getElementById(id);
+        let start = Date.now();
+        const interval = setInterval(() => {
+            const percent = Math.min(100, ((Date.now() - start) / duration) * 100);
+            bar.innerHTML = `<div class="bar"><div class="bar-fill" style="width:${percent}%; background:gray"></div></div>`;
+            if (percent >= 100) {
+                clearInterval(interval);
+                callback();
+            }
+        }, 100);
+    }
 
-        function repair(index) {
-            if (busy) return;
-            const car = inventory[index];
-            const cost = (100 - car.technik) * 2;
-            if (car.technik >= 100 || balance < cost) return;
-            busy = true;
-            balance -= cost;
-            updateStatus();
-            animateProgress(`progress-${index}`, 3000, () => {
-                car.technik = 100;
-                car.repairTotal += cost;
-                busy = false;
-                renderInventory();
-            });
-        }
+    function repair(index) {
+        if (busy) return;
+        const car = inventory[index];
+        const cost = (100 - car.technik) * 2;
+        if (car.technik >= 100 || balance < cost) return;
+        busy = true;
+        balance -= cost;
+        updateStatus();
+        animateProgress(`progress-${index}`, 3000, () => {
+            car.technik = 100;
+            car.repairTotal += cost;
+            busy = false;
+            renderInventory();
+        });
+    }
 
-        function polish(index) {
-            if (busy) return;
-            const car = inventory[index];
-            const cost = Math.floor((100 - car.optik) / 2);
-            if (car.optik >= 100 || balance < cost) return;
-            busy = true;
-            balance -= cost;
-            updateStatus();
-            animateProgress(`progress-${index}`, 3000, () => {
-                car.optik = 100;
-                car.repairTotal += cost;
-                busy = false;
-                renderInventory();
-            });
-        }
+    function polish(index) {
+        if (busy) return;
+        const car = inventory[index];
+        const cost = Math.floor((100 - car.optik) / 2);
+        if (car.optik >= 100 || balance < cost) return;
+        busy = true;
+        balance -= cost;
+        updateStatus();
+        animateProgress(`progress-${index}`, 3000, () => {
+            car.optik = 100;
+            car.repairTotal += cost;
+            busy = false;
+            renderInventory();
+        });
+    }
 
-        function prepareSale(index) {
-            if (busy) return;
-            const car = inventory[index];
+    function prepareSale(index) {
+        if (busy) return;
+        const car = inventory[index];
+        const totalCost = car.price + car.repairTotal;
+        const price = prompt(`Kosten insgesamt: ${totalCost}€. Verkaufspreis festlegen:`, totalCost + 500);
+        if (!price) return;
+        busy = true;
+        setTimeout(() => {
+            car.salePrice = parseInt(price);
+            car.saleStart = Date.now();
+            listed.push(car);
+            inventory.splice(index, 1);
+            renderInventory();
+            renderListed();
+            busy = false;
+        }, 3000);
+    }
+
+    function renderListed() {
+        const container = document.getElementById("listed");
+        container.innerHTML = "";
+        const now = Date.now();
+
+        listed.forEach((car, index) => {
+            const div = document.createElement("div");
+            div.className = "car";
             const totalCost = car.price + car.repairTotal;
-            const price = prompt(`Kosten insgesamt: ${totalCost}€. Verkaufspreis festlegen:`, totalCost + 500);
-            if (!price) return;
-            busy = true;
-            setTimeout(() => {
-                car.salePrice = parseInt(price);
-                listed.push(car);
-                inventory.splice(index, 1);
-                renderInventory();
-                renderListed();
-                busy = false;
-            }, 3000);
-        }
+            const waitTime = Math.max(30000, Math.min(300000, (100 - ((car.optik + car.technik) / 2)) * 1000 + (car.salePrice - totalCost) * 5));
+            const elapsed = now - car.saleStart;
+            const percent = Math.min(100, (elapsed / waitTime) * 100);
+            div.innerHTML = `
+                <strong>${car.manufacturer} ${car.model}</strong><br>
+                Verkaufspreis: ${car.salePrice}€<br>
+                <div class="bar"><div class="bar-fill" style="width:${percent}%; background:green"></div></div>
+            `;
+            container.appendChild(div);
 
-        function renderListed() {
-            const container = document.getElementById("listed");
-            container.innerHTML = "";
-            listed.forEach((car, index) => {
-                const div = document.createElement("div");
-                div.className = "car";
-                const now = Date.now();
-                const waitTime = Math.max(30000, Math.min(300000, (100 - ((car.optik + car.technik) / 2)) * 1000 + (car.salePrice - (car.price + car.repairTotal)) * 5));
-                if (!car.saleStart) car.saleStart = now;
-                const percent = Math.min(100, ((now - car.saleStart) / waitTime) * 100);
-                div.innerHTML = `
-                    <strong>${car.manufacturer} ${car.model}</strong><br>
-                    Verkaufspreis: ${car.salePrice}€<br>
-                    <div class="bar"><div class="bar-fill" style="width:${percent}%; background:green"></div></div>
-                `;
-                if (percent >= 100) {
-                    if (Math.random() < 0.95) {
-                        balance += car.salePrice;
-                    } else {
-                        inventory.push(car);
-                    }
+            if (percent >= 100) {
+                const successChance = 1 - Math.min(0.5, (car.salePrice - totalCost) / totalCost);
+                if (Math.random() < successChance) {
+                    balance += car.salePrice;
                     listed.splice(index, 1);
                     updateStatus();
                     renderListed();
-                    renderInventory();
                 } else {
-                    container.appendChild(div);
+                    // Rückkehr in Bestand nach 3 Sekunden
+                    setTimeout(() => {
+                        inventory.push(car);
+                        listed.splice(index, 1);
+                        updateStatus();
+                        renderInventory();
+                        renderListed();
+                    }, 3000);
                 }
-            });
-        }
-
-        function updateLoop() {
-            renderMarket();
-            renderListed();
-        }
-
-        function generateMarketCars() {
-            while (marketCars.length < 5) {
-                marketCars.push(getRandomCar());
             }
+        });
+    }
+
+    function updateLoop() {
+        renderMarket();
+        renderListed();
+    }
+
+    function generateMarketCars() {
+        while (marketCars.length < 5) {
+            marketCars.push(getRandomCar());
         }
+    }
 
-        setInterval(() => {
-            generateMarketCars();
-            updateLoop();
-        }, 1000);
+    setInterval(() => {
+        generateMarketCars();
+        updateLoop();
+    }, 1000);
 
-        updateStatus();
-    </script>
+    updateStatus();
+</script>
 
 </body>
 </html>
