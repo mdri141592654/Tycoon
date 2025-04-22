@@ -8,18 +8,25 @@
         .status { font-weight: bold; margin-bottom: 20px; }
         .dropdown { margin-bottom: 20px; }
         .car { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
-        .bar {
-            background: #ddd;
-            width: 100%;
-            height: 10px;
-            margin: 5px 0;
-            position: relative;
-        }
-        .bar-fill {
-            background: green;
-            height: 100%;
-        }
+        .bar { background: #ddd; width: 100%; height: 10px; margin: 5px 0; position: relative; }
+        .bar-fill { background: green; height: 100%; }
         .progress { height: 10px; background: #eee; margin-top: 5px; }
+        .modal {
+            position: fixed;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -30%);
+            background: white;
+            border: 2px solid #444;
+            padding: 20px;
+            z-index: 1000;
+        }
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
     </style>
 </head>
 <body>
@@ -40,6 +47,8 @@
     <summary>Inserierte Fahrzeuge</summary>
     <div id="listed"></div>
 </details>
+
+<div id="modal-container"></div>
 
 <script>
     let balance = 5000;
@@ -175,18 +184,42 @@
         if (busy) return;
         const car = inventory[index];
         const totalCost = car.price + car.repairTotal;
-        const price = prompt(`Kosten insgesamt: ${totalCost}€. Verkaufspreis festlegen:`, totalCost + 500);
-        if (!price) return;
-        busy = true;
-        setTimeout(() => {
-            car.salePrice = parseInt(price);
-            car.saleStart = Date.now();
-            listed.push(car);
-            inventory.splice(index, 1);
-            renderInventory();
-            renderListed();
-            busy = false;
-        }, 3000);
+        const minPrice = totalCost;
+        const maxPrice = totalCost + 2000;
+        const defaultPrice = totalCost + 500;
+
+        const modalContainer = document.getElementById("modal-container");
+        modalContainer.innerHTML = `
+            <div class="overlay" onclick="closeModal()"></div>
+            <div class="modal">
+                <p><strong>Inseratspreis festlegen</strong></p>
+                <p>Gesamtkosten bisher: ${totalCost}€</p>
+                <input type="range" id="priceSlider" min="${minPrice}" max="${maxPrice}" value="${defaultPrice}" step="10" style="width:100%;">
+                <p>Preis: <span id="sliderValue">${defaultPrice}</span>€</p>
+                <button onclick="confirmSale(${index})">Inserieren</button>
+                <button onclick="closeModal()">Abbrechen</button>
+            </div>
+        `;
+
+        document.getElementById("priceSlider").oninput = function () {
+            document.getElementById("sliderValue").innerText = this.value;
+        };
+    }
+
+    function confirmSale(index) {
+        const price = parseInt(document.getElementById("priceSlider").value);
+        const car = inventory[index];
+        car.salePrice = price;
+        car.saleStart = Date.now();
+        listed.push(car);
+        inventory.splice(index, 1);
+        closeModal();
+        renderInventory();
+        renderListed();
+    }
+
+    function closeModal() {
+        document.getElementById("modal-container").innerHTML = "";
     }
 
     function renderListed() {
@@ -216,7 +249,6 @@
                     updateStatus();
                     renderListed();
                 } else {
-                    // Rückkehr in Bestand nach 3 Sekunden
                     setTimeout(() => {
                         inventory.push(car);
                         listed.splice(index, 1);
