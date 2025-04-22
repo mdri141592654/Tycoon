@@ -4,280 +4,216 @@
     <meta charset="UTF-8">
     <title>Gebrauchtwagenhändler Tycoon</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .status { font-weight: bold; margin-bottom: 20px; }
-        .dropdown { margin-bottom: 20px; }
-        .car { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
-        .bar { background: #ddd; width: 100%; height: 10px; margin: 5px 0; position: relative; }
-        .bar-fill { background: green; height: 100%; }
-        .progress { height: 10px; background: #eee; margin-top: 5px; }
-        .modal {
-            position: fixed;
-            top: 30%;
-            left: 50%;
-            transform: translate(-50%, -30%);
-            background: white;
-            border: 2px solid #444;
-            padding: 20px;
-            z-index: 1000;
-        }
-        .overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 999;
-        }
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        h2 { cursor: pointer; background: #ddd; padding: 10px; margin-top: 10px; }
+        .dropdown-content { display: none; background: white; padding: 10px; border: 1px solid #ccc; }
+        .vehicle { border: 1px solid #aaa; padding: 10px; margin: 10px 0; background: #fff; }
+        .bar { height: 20px; background: #eee; margin: 5px 0; position: relative; }
+        .bar-inner { height: 100%; background: green; width: 0%; }
+        .status { background: #333; color: white; padding: 10px; position: sticky; top: 0; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
-<div class="status" id="status">Kontostand: 5000€ / Fahrzeuge im Bestand: 0</div>
+<div class="status">
+    Kontostand: <span id="money">1000</span> € | Fahrzeuge im Bestand: <span id="inventoryCount">0</span>
+</div>
 
-<details class="dropdown">
-    <summary>Fahrzeuge zum Kauf</summary>
-    <div id="market"></div>
-</details>
+<h2 onclick="toggleDropdown('kaufen')">Fahrzeuge zum Kauf</h2>
+<div id="kaufen" class="dropdown-content"></div>
 
-<details class="dropdown">
-    <summary>Fahrzeuge im Bestand</summary>
-    <div id="inventory"></div>
-</details>
+<h2 onclick="toggleDropdown('bestand')">Fahrzeuge im Bestand</h2>
+<div id="bestand" class="dropdown-content"></div>
 
-<details class="dropdown">
-    <summary>Inserierte Fahrzeuge</summary>
-    <div id="listed"></div>
-</details>
-
-<div id="modal-container"></div>
+<h2 onclick="toggleDropdown('inseriert')">Inserierte Fahrzeuge</h2>
+<div id="inseriert" class="dropdown-content"></div>
 
 <script>
-    let balance = 5000;
-    let inventory = [];
-    let listed = [];
-    let marketCars = [];
+let money = 1000;
+let inventory = [];
+let listed = [];
+let availableCars = [];
+let busy = false;
 
-    const manufacturers = ["AutoLux", "RoadMax", "VelociCar", "SunDrive", "PrimeAuto"];
-    const models = ["Turbo", "Speedster", "Comet", "Falcon", "EcoRide"];
+function updateMoney() {
+    document.getElementById("money").textContent = money.toFixed(2);
+    document.getElementById("inventoryCount").textContent = inventory.length;
+}
 
-    function updateStatus() {
-        document.getElementById("status").innerText = `Kontostand: ${balance}€ / Fahrzeuge im Bestand: ${inventory.length}`;
+function toggleDropdown(id) {
+    const content = document.getElementById(id);
+    content.style.display = content.style.display === "none" ? "block" : "none";
+}
+
+function generateCar() {
+    const brands = ["Zentra", "Mobilia", "Cartana", "Tiron"];
+    const models = ["X100", "Sprinto", "Velox", "Rover", "Luxon"];
+    return {
+        id: Math.random().toString(36).substr(2, 9),
+        name: brands[Math.floor(Math.random() * brands.length)] + " " + models[Math.floor(Math.random() * models.length)],
+        optik: Math.floor(Math.random() * 51) + 30,
+        technik: Math.floor(Math.random() * 51) + 30,
+        reparaturkosten: Math.floor(Math.random() * 200) + 100,
+        preis: Math.floor(Math.random() * 300) + 200,
+        dauer: Math.random() * 270000 + 30000
+    };
+}
+
+function updateDropdowns() {
+    const kaufenDiv = document.getElementById("kaufen");
+    kaufenDiv.innerHTML = "";
+    const now = Date.now();
+
+    availableCars = availableCars.filter(car => now < car.expiry);
+    while (availableCars.length < 5) {
+        const car = generateCar();
+        car.expiry = Date.now() + car.dauer;
+        availableCars.push(car);
     }
 
-    function getRandomCar() {
-        const manufacturer = manufacturers[Math.floor(Math.random() * manufacturers.length)];
-        const model = models[Math.floor(Math.random() * models.length)];
-        const optik = Math.floor(Math.random() * 70) + 10;
-        const technik = Math.floor(Math.random() * 70) + 10;
-        const price = Math.floor((optik + technik) * 10 + Math.random() * 500);
-        const repCost = Math.floor((100 - technik) * 2 + (100 - optik));
-        const id = Math.random().toString(36).substring(2, 9);
-        const ttl = Date.now() + (30000 + Math.random() * 240000);
-        return { id, manufacturer, model, optik, technik, price, repCost, ttl };
-    }
-
-    function renderMarket() {
-        const now = Date.now();
-        marketCars = marketCars.filter(car => car.ttl > now);
-        const container = document.getElementById("market");
-        container.innerHTML = "";
-        marketCars.forEach(car => {
-            const div = document.createElement("div");
-            div.className = "car";
-            const timeLeft = Math.max(0, Math.floor((car.ttl - now) / 1000));
-            div.innerHTML = `
-                <strong>${car.manufacturer} ${car.model}</strong><br>
-                Optik: <div class="bar"><div class="bar-fill" style="width:${car.optik}%; background:orange"></div></div>
-                Technik: <div class="bar"><div class="bar-fill" style="width:${car.technik}%; background:blue"></div></div>
-                Geschätzte Reparaturkosten: ${car.repCost}€<br>
-                Kaufpreis: ${car.price}€<br>
-                Verfügbar für: ${timeLeft}s<br>
-                <button onclick="buyCar('${car.id}')">Kaufen</button>
-            `;
-            container.appendChild(div);
-        });
-    }
-
-    function buyCar(id) {
-        const car = marketCars.find(c => c.id === id);
-        if (!car) return;
-        const price = parseInt(car.price);
-        if (balance < price) return alert("Nicht genug Geld!");
-        balance -= price;
-        updateStatus();
-        marketCars = marketCars.filter(c => c.id !== id);
-        renderMarket();
-        setTimeout(() => {
-            inventory.push({ ...car, repairTotal: 0, salePrice: null });
-            updateStatus();
-            renderInventory();
-        }, 3000);
-    }
-
-    let busy = false;
-
-    function renderInventory() {
-        const container = document.getElementById("inventory");
-        container.innerHTML = "";
-        inventory.forEach((car, index) => {
-            const div = document.createElement("div");
-            div.className = "car";
-            div.innerHTML = `
-                <strong>${car.manufacturer} ${car.model}</strong><br>
-                Optik: <div class="bar"><div class="bar-fill" style="width:${car.optik}%; background:orange"></div></div>
-                Technik: <div class="bar"><div class="bar-fill" style="width:${car.technik}%; background:blue"></div></div>
-                Gesamt-Kosten bisher: ${car.price + car.repairTotal}€<br>
-                <button onclick="repair(${index})" ${busy ? 'disabled' : ''}>Reparieren (${(100 - car.technik) * 2}€)</button>
-                <button onclick="polish(${index})" ${busy ? 'disabled' : ''}>Optisch aufwerten (${Math.floor((100 - car.optik) / 2)}€)</button>
-                <button onclick="prepareSale(${index})" ${busy ? 'disabled' : ''}>Inserieren</button>
-                <div class="progress" id="progress-${index}"></div>
-            `;
-            container.appendChild(div);
-        });
-    }
-
-    function animateProgress(id, duration, callback) {
-        const bar = document.getElementById(id);
-        let start = Date.now();
-        const interval = setInterval(() => {
-            const percent = Math.min(100, ((Date.now() - start) / duration) * 100);
-            bar.innerHTML = `<div class="bar"><div class="bar-fill" style="width:${percent}%; background:gray"></div></div>`;
-            if (percent >= 100) {
-                clearInterval(interval);
-                callback();
-            }
-        }, 100);
-    }
-
-    function repair(index) {
-        if (busy) return;
-        const car = inventory[index];
-        const cost = (100 - car.technik) * 2;
-        if (car.technik >= 100 || balance < cost) return;
-        busy = true;
-        balance -= cost;
-        updateStatus();
-        animateProgress(`progress-${index}`, 3000, () => {
-            car.technik = 100;
-            car.repairTotal += cost;
-            busy = false;
-            renderInventory();
-        });
-    }
-
-    function polish(index) {
-        if (busy) return;
-        const car = inventory[index];
-        const cost = Math.floor((100 - car.optik) / 2);
-        if (car.optik >= 100 || balance < cost) return;
-        busy = true;
-        balance -= cost;
-        updateStatus();
-        animateProgress(`progress-${index}`, 3000, () => {
-            car.optik = 100;
-            car.repairTotal += cost;
-            busy = false;
-            renderInventory();
-        });
-    }
-
-    function prepareSale(index) {
-        if (busy) return;
-        const car = inventory[index];
-        const totalCost = car.price + car.repairTotal;
-        const minPrice = totalCost;
-        const maxPrice = totalCost + 2000;
-        const defaultPrice = totalCost + 500;
-
-        const modalContainer = document.getElementById("modal-container");
-        modalContainer.innerHTML = `
-            <div class="overlay" onclick="closeModal()"></div>
-            <div class="modal">
-                <p><strong>Inseratspreis festlegen</strong></p>
-                <p>Gesamtkosten bisher: ${totalCost}€</p>
-                <input type="range" id="priceSlider" min="${minPrice}" max="${maxPrice}" value="${defaultPrice}" step="10" style="width:100%;">
-                <p>Preis: <span id="sliderValue">${defaultPrice}</span>€</p>
-                <button onclick="confirmSale(${index})">Inserieren</button>
-                <button onclick="closeModal()">Abbrechen</button>
-            </div>
+    for (let car of availableCars) {
+        const div = document.createElement("div");
+        div.className = "vehicle";
+        div.innerHTML = `
+            <strong>${car.name}</strong><br>
+            Preis: ${car.preis} €<br>
+            Optik:
+            <div class="bar"><div class="bar-inner" style="width:${car.optik}%"></div></div>
+            Technik:
+            <div class="bar"><div class="bar-inner" style="width:${car.technik}%"></div></div>
+            Geschätzte Reparaturkosten: ${car.reparaturkosten} €<br>
+            <div class="bar"><div class="bar-inner" style="width:${((car.expiry - now) / car.dauer) * 100}%"></div></div>
+            <button onclick="kaufen('${car.id}')">Kaufen</button>
         `;
-
-        document.getElementById("priceSlider").oninput = function () {
-            document.getElementById("sliderValue").innerText = this.value;
-        };
+        kaufenDiv.appendChild(div);
     }
 
-    function confirmSale(index) {
-        const price = parseInt(document.getElementById("priceSlider").value);
-        const car = inventory[index];
-        car.salePrice = price;
-        car.saleStart = Date.now();
-        listed.push(car);
-        inventory.splice(index, 1);
-        closeModal();
-        renderInventory();
-        renderListed();
+    setTimeout(updateDropdowns, 1000);
+}
+
+function kaufen(id) {
+    if (busy) return alert("Bitte warte, eine Aktion läuft noch.");
+    const car = availableCars.find(c => c.id === id);
+    if (!car || money < car.preis) return alert("Nicht genügend Geld.");
+    money -= car.preis;
+    updateMoney();
+    busy = true;
+    setTimeout(() => {
+        inventory.push({...car});
+        updateInventory();
+        busy = false;
+    }, 3000);
+}
+
+function updateInventory() {
+    const bestand = document.getElementById("bestand");
+    bestand.innerHTML = "";
+    for (let i = 0; i < inventory.length; i++) {
+        const car = inventory[i];
+        const div = document.createElement("div");
+        div.className = "vehicle";
+        div.innerHTML = `
+            <strong>${car.name}</strong><br>
+            Optik:
+            <div class="bar"><div class="bar-inner" style="width:${car.optik}%"></div></div>
+            Technik:
+            <div class="bar"><div class="bar-inner" style="width:${car.technik}%"></div></div>
+            <button onclick="verbessern(${i}, 'optik')">Optik aufwerten (10€)</button>
+            <button onclick="verbessern(${i}, 'technik')">Technik reparieren (${car.reparaturkosten}€)</button>
+            <div id="aktion${i}"></div>
+            <br><br>
+            <label>Inseratspreis: <span id="preislabel${i}">${car.preis + car.reparaturkosten + 50}</span> €</label><br>
+            <input type="range" min="${car.preis + car.reparaturkosten}" max="${car.preis + car.reparaturkosten + 500}" value="${car.preis + car.reparaturkosten + 50}" onchange="updateLabel(${i}, this.value)">
+            <br>
+            <button onclick="inserieren(${i})">Inserieren</button>
+        `;
+        bestand.appendChild(div);
     }
+}
 
-    function closeModal() {
-        document.getElementById("modal-container").innerHTML = "";
-    }
+function updateLabel(i, value) {
+    document.getElementById("preislabel" + i).textContent = value;
+}
 
-    function renderListed() {
-        const container = document.getElementById("listed");
-        container.innerHTML = "";
-        const now = Date.now();
-
-        listed.forEach((car, index) => {
-            const div = document.createElement("div");
-            div.className = "car";
-            const totalCost = car.price + car.repairTotal;
-            const waitTime = Math.max(30000, Math.min(300000, (100 - ((car.optik + car.technik) / 2)) * 1000 + (car.salePrice - totalCost) * 5));
-            const elapsed = now - car.saleStart;
-            const percent = Math.min(100, (elapsed / waitTime) * 100);
-            div.innerHTML = `
-                <strong>${car.manufacturer} ${car.model}</strong><br>
-                Verkaufspreis: ${car.salePrice}€<br>
-                <div class="bar"><div class="bar-fill" style="width:${percent}%; background:green"></div></div>
-            `;
-            container.appendChild(div);
-
-            if (percent >= 100) {
-                const successChance = 1 - Math.min(0.5, (car.salePrice - totalCost) / totalCost);
-                if (Math.random() < successChance) {
-                    balance += car.salePrice;
-                    listed.splice(index, 1);
-                    updateStatus();
-                    renderListed();
-                } else {
-                    setTimeout(() => {
-                        inventory.push(car);
-                        listed.splice(index, 1);
-                        updateStatus();
-                        renderInventory();
-                        renderListed();
-                    }, 3000);
-                }
-            }
-        });
-    }
-
-    function updateLoop() {
-        renderMarket();
-        renderListed();
-    }
-
-    function generateMarketCars() {
-        while (marketCars.length < 5) {
-            marketCars.push(getRandomCar());
+function verbessern(index, typ) {
+    if (busy) return alert("Eine andere Aktion läuft bereits.");
+    const car = inventory[index];
+    let kosten = typ === "optik" ? 10 : car.reparaturkosten;
+    if (money < kosten) return alert("Nicht genug Geld.");
+    if ((typ === "optik" && car.optik >= 100) || (typ === "technik" && car.technik >= 100)) return alert("Bereits maximal verbessert.");
+    money -= kosten;
+    updateMoney();
+    busy = true;
+    let target = typ === "optik" ? 'optik' : 'technik';
+    let duration = 5000;
+    const aktionDiv = document.getElementById("aktion" + index);
+    aktionDiv.innerHTML = `<div class="bar"><div class="bar-inner" id="ladebalken${index}" style="width:0%"></div></div>`;
+    let start = Date.now();
+    let interval = setInterval(() => {
+        let percent = ((Date.now() - start) / duration) * 100;
+        document.getElementById("ladebalken" + index).style.width = percent + "%";
+        if (percent >= 100) {
+            clearInterval(interval);
+            car[target] = 100;
+            busy = false;
+            updateInventory();
         }
+    }, 100);
+}
+
+function inserieren(index) {
+    if (busy) return alert("Bitte warte, eine Aktion läuft noch.");
+    const car = inventory.splice(index, 1)[0];
+    const preis = parseInt(document.getElementById("preislabel" + index).textContent);
+    busy = true;
+    setTimeout(() => {
+        busy = false;
+        car.inseratspreis = preis;
+        car.verkaufsdauer = Math.max(30000, 300000 - (car.optik + car.technik) * 100 - preis);
+        car.startZeit = Date.now();
+        listed.push(car);
+        updateInventory();
+        updateInserate();
+    }, 3000);
+}
+
+function updateInserate() {
+    const inseriert = document.getElementById("inseriert");
+    inseriert.innerHTML = "";
+    const now = Date.now();
+    for (let i = listed.length - 1; i >= 0; i--) {
+        const car = listed[i];
+        const fortschritt = (now - car.startZeit) / car.verkaufsdauer;
+        if (fortschritt >= 1) {
+            if (Math.random() < 0.9 || car.inseratspreis < car.preis + car.reparaturkosten + 100) {
+                money += car.inseratspreis;
+                listed.splice(i, 1);
+                updateMoney();
+                continue;
+            } else {
+                inventory.push(car);
+                listed.splice(i, 1);
+                updateInventory();
+                continue;
+            }
+        }
+        const div = document.createElement("div");
+        div.className = "vehicle";
+        div.innerHTML = `
+            <strong>${car.name}</strong><br>
+            Inseratspreis: ${car.inseratspreis} €<br>
+            <div class="bar"><div class="bar-inner" style="width:${fortschritt * 100}%"></div></div>
+        `;
+        inseriert.appendChild(div);
     }
+    setTimeout(updateInserate, 1000);
+}
 
-    setInterval(() => {
-        generateMarketCars();
-        updateLoop();
-    }, 1000);
-
-    updateStatus();
+updateMoney();
+updateDropdowns();
+updateInventory();
+updateInserate();
 </script>
 
 </body>
